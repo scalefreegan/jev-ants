@@ -185,3 +185,13 @@ Estimate at 1,000 ants, compass brain (~296 tok/ant), 2 s cadence, a ~90 s formi
 ### 8.4 Real cost, not estimates
 
 The server keeps a ledger of `usage.input_tokens` per response and the panel shows: tokens this run, dollars this run (tokens × $0.042/M), elapsed, requests, median latency, and the active-ant count. The per-formation figure from the ledger goes into the README once measured. If TypeSafe exposes a billing endpoint later, the console total should reconcile with the ledger.
+
+### 8.5 Live results (2026-10-25, 1,000 ants, compass brain, overseer on)
+
+| Run | Formed in | Requests | Tokens | Cost |
+|---|---|---|---|---|
+| "ANTS" from scatter | 13 s | 95 | 1.71 M | $0.072 |
+| Morph "ANTS" → "JEV" (no scatter) | 9 s | 61 | 1.30 M | $0.055 |
+| Morph "JEV" → uploaded ring PNG | 13 s | 90 | 1.68 M | $0.070 |
+
+The overseer costs **1,259 input tokens per look** (two 480×320 PNGs plus the box and noul), about $0.00005, three looks per run at the 4 s cadence: noise next to the ants. Its `done` noul read 41–65 % on pictures the grid metric called formed (86–96 %), so the badge stays driven by the grid and the noul is shown as "recognisable N %". The box mostly landed on the blank middle of a formed letter or ring and was rejected by the ink-share guard (`box ignored` in the panel); it steered only early in a run. Fine as a showcase of the image path, not load-bearing, which is what §7 predicted.
