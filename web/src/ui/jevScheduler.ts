@@ -1,6 +1,8 @@
 import type { JevProxyReply, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
 import type { Engine } from "../sim/engine.ts";
 import { antState, applyDecision, calibration, packRequest, readDecision, type AntState, type Neutral, type Schema } from "../sim/jevBrain.ts";
+import { boxArea, boxCentre, boxInkShare, buildOverseerRequest, readOverseer, type Box } from "../sim/overseer.ts";
+import { overseerImages } from "./overseerImages.ts";
 import type { JevAnswer } from "../../shared/jev.ts";
 
 // Drives the Jev brain against the proxy. Every `intervalMs` it takes the
@@ -20,9 +22,25 @@ export interface SchedulerOptions {
   minAgeSeconds: number;
   /** sample the compass choice from its probabilities instead of argmax */
   sample: boolean;
+  /** the image overseer: on/off and how often it looks, ms */
+  overseer: boolean;
+  overseerMs: number;
 }
 
-export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 6, intervalMs: 200, minAgeSeconds: 1.5, sample: false };
+export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 6, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000 };
+
+export interface OverseerState {
+  box: Box | null;
+  /** did the box pass the sanity check and become the attractor */
+  steering: boolean;
+  done: number;
+  inputTokens: number;
+  ms: number;
+  calls: number;
+  /** tokens spent by the overseer this run */
+  tokensThisRun: number;
+  at: number;
+}
 
 export interface Sample {
   id: string;
@@ -41,6 +59,7 @@ export interface SchedulerState {
   sample: Sample | null;
   /** the last reply's neutral point (what Jev answers for an ant with nothing around it) */
   neutral: Neutral | null;
+  overseer: OverseerState | null;
   /** client-side running total across runs this page-load, dollars */
   sessionUsd: number;
   sessionTokens: number;
@@ -52,10 +71,12 @@ export class JevScheduler {
   #engine: Engine;
   opts: SchedulerOptions;
   #timer: ReturnType<typeof setInterval> | null = null;
+  #overseerTimer: ReturnType<typeof setInterval> | null = null;
+  #overseerBusy = false;
   #inFlight = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
-  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, sessionUsd: 0, sessionTokens: 0 };
+  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, sessionUsd: 0, sessionTokens: 0 };
   #lastRunTokens = 0;
   #startedAt = 0;
 
@@ -100,8 +121,10 @@ export class JevScheduler {
     this.#engine.jevOwned.fill(1);
     this.#engine.params.brain = "jev";
     this.#startedAt = performance.now();
-    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0 });
+    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0, overseer: null });
+    this.#engine.attractor = null;
     if (this.#timer === null) this.#timer = setInterval(() => void this.#cycle(), this.opts.intervalMs);
+    if (this.#overseerTimer === null) this.#overseerTimer = setInterval(() => void this.#oversee(), this.opts.overseerMs);
   }
 
   /** Seconds since Start, for the "formed" rule. */
@@ -127,6 +150,11 @@ export class JevScheduler {
       clearInterval(this.#timer);
       this.#timer = null;
     }
+    if (this.#overseerTimer !== null) {
+      clearInterval(this.#overseerTimer);
+      this.#overseerTimer = null;
+    }
+    this.#engine.attractor = null;
     this.#engine.jevOwned.fill(0);
     // After a run the stragglers finish with the local rule, so a formed
     // picture stays formed without spending.
@@ -157,6 +185,38 @@ export class JevScheduler {
     this.#lastRunTokens = run.inputTokens;
     this.#state.sessionTokens += delta;
     this.#state.sessionUsd = this.#state.sessionTokens * (0.042 / 1_000_000);
+  }
+
+  async #oversee(): Promise<void> {
+    if (!this.opts.overseer || this.#state.phase !== "running" || this.#overseerBusy) return;
+    const e = this.#engine;
+    this.#overseerBusy = true;
+    try {
+      const images = await overseerImages(e.target, e.occupancy, e.params.size);
+      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)) });
+      const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
+      if (res.status === 409) return; // the run ended; the ant loop handles the stop
+      if (!res.ok) return; // busy or a server error: skip this look
+      const reply = body as JevProxyReply;
+      if (reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
+        this.#set({ lastError: `overseer: jev answered ${reply.status}` });
+        return;
+      }
+      const reading = readOverseer((reply.body as JevResponse).answers);
+      if (!reading) return;
+      const steering = reading.box !== null && boxSteers(reading.box, e.target, e.params.size);
+      e.attractor = steering && reading.box ? boxCentre(reading.box, e.params.size) : null;
+      this.#absorb(reply.run);
+      const prev = this.#state.overseer;
+      this.#set({
+        run: reply.run,
+        overseer: { box: reading.box, steering, done: reading.done, inputTokens: reply.inputTokens, ms: reply.ms, calls: (prev?.calls ?? 0) + 1, tokensThisRun: (prev?.tokensThisRun ?? 0) + reply.inputTokens, at: performance.now() },
+      });
+    } catch (err) {
+      this.#set({ lastError: `overseer: ${String(err)}` });
+    } finally {
+      this.#overseerBusy = false;
+    }
   }
 
   async #cycle(): Promise<void> {
@@ -248,6 +308,16 @@ export class JevScheduler {
     this.#absorb(reply.run);
     this.#set({ run: reply.run, sample: sample ?? this.#state.sample, neutral, lastError: null });
   }
+}
+
+// The overseer's look: two PNGs, a box and a noul, through the same proxy and
+// ledger as the ants. The box steers only when it is specific (under half the
+// picture) and sits on ink the target actually asks for.
+const OVERSEER_MAX_AREA = 0.5;
+const OVERSEER_MIN_INK = 0.05;
+
+export function boxSteers(box: Box, target: Float32Array, size: { w: number; h: number }): boolean {
+  return boxArea(box) <= OVERSEER_MAX_AREA && boxInkShare(box, target, size) >= OVERSEER_MIN_INK;
 }
 
 function compassOf(h: number): string {

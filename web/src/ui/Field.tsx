@@ -12,19 +12,26 @@ interface Props {
   engine: Engine;
   onFrame: (fn: () => void) => () => void;
   showHeatmap: boolean;
+  /** the overseer's last box, normalised edges, drawn in jade */
+  box: { top: number; bottom: number; left: number; right: number } | null;
+  boxSteering: boolean;
 }
 
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-export default function Field({ engine, onFrame, showHeatmap }: Props) {
+export default function Field({ engine, onFrame, showHeatmap, box, boxSteering }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
   const showHeat = useRef(showHeatmap);
+  const boxRef = useRef<{ box: Props["box"]; steering: boolean }>({ box, steering: boxSteering });
   useEffect(() => {
     showHeat.current = showHeatmap;
   }, [showHeatmap]);
+  useEffect(() => {
+    boxRef.current = { box, steering: boxSteering };
+  }, [box, boxSteering]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,12 +47,14 @@ export default function Field({ engine, onFrame, showHeatmap }: Props) {
     let paper = cssVar("--paper");
     let ink = cssVar("--ink");
     let inkSettled = cssVar("--ink-settled");
+    let accent = cssVar("--accent");
     let heatRgb = cssVar("--heat").split(/\s+/).map(Number);
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const retheme = () => {
       paper = cssVar("--paper");
       ink = cssVar("--ink");
       inkSettled = cssVar("--ink-settled");
+      accent = cssVar("--accent");
       heatRgb = cssVar("--heat").split(/\s+/).map(Number);
     };
     mq.addEventListener("change", retheme);
@@ -118,6 +127,17 @@ export default function Field({ engine, onFrame, showHeatmap }: Props) {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+
+      const b = boxRef.current.box;
+      if (b) {
+        ctx.save();
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = boxRef.current.steering ? 0.7 : 0.25;
+        ctx.lineWidth = 2;
+        ctx.setLineDash(boxRef.current.steering ? [] : [6, 6]);
+        ctx.strokeRect(b.left * W, b.top * H, (b.right - b.left) * W, (b.bottom - b.top) * H);
+        ctx.restore();
+      }
     };
     const off = onFrame(draw);
     draw();

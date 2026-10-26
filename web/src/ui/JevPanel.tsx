@@ -12,6 +12,8 @@ interface Props {
   stop: () => void;
   stopOnFormed: boolean;
   setStopOnFormed: (v: boolean) => void;
+  overseer: boolean;
+  setOverseer: (v: boolean) => void;
   activeAnts: number;
   jevDecisions: number;
 }
@@ -66,6 +68,15 @@ export default function JevPanel(p: Props) {
         <span>Stop when formed</span>
         <input type="checkbox" checked={p.stopOnFormed} onChange={(e) => p.setStopOnFormed(e.target.checked)} />
       </label>
+      <label className="mt-1 flex items-center justify-between text-sm text-fg-2" title="Every 4 s Jev looks at the field and the target as images: a box for the emptiest region (the ants' attractor) and a noul for 'recognisable'">
+        <span>Image overseer</span>
+        <input type="checkbox" checked={p.overseer} onChange={(e) => p.setOverseer(e.target.checked)} />
+      </label>
+      {p.state.overseer && (
+        <p className="mt-1 font-mono text-xs text-fg-3">
+          overseer: recognisable {Math.round(p.state.overseer.done * 100)}% · box {p.state.overseer.box ? (p.state.overseer.steering ? "steering" : "ignored") : "none"} · {p.state.overseer.inputTokens.toLocaleString()} tok/look · {p.state.overseer.calls} looks
+        </p>
+      )}
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm text-fg-2">
         <dt className="text-fg-3">cost this run</dt>

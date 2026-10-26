@@ -14,6 +14,14 @@ export function useJev(engine: Engine, formed: boolean) {
   const [caps, setCaps] = useState<RunCaps>(DEFAULT_CAPS);
   const [schema, setSchemaState] = useState<Schema>("compass");
   const [stopOnFormed, setStopOnFormed] = useState(true);
+  const [overseer, setOverseerState] = useState(true);
+  const setOverseer = useCallback(
+    (on: boolean) => {
+      scheduler.setOptions({ overseer: on });
+      setOverseerState(on);
+    },
+    [scheduler],
+  );
 
   useEffect(() => {
     const off = scheduler.subscribe(setState);
@@ -40,5 +48,5 @@ export function useJev(engine: Engine, formed: boolean) {
     if (formed && stopOnFormed && state.phase === "running" && state.requestsSent > 0 && scheduler.runSeconds > 3) void scheduler.stop("formed");
   }, [formed, stopOnFormed, state.phase, state.requestsSent, scheduler]);
 
-  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed };
+  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer };
 }
