@@ -22,7 +22,7 @@ export interface SchedulerOptions {
   sample: boolean;
 }
 
-export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 8, intervalMs: 200, minAgeSeconds: 1.5, sample: false };
+export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 6, intervalMs: 200, minAgeSeconds: 1.5, sample: false };
 
 export interface Sample {
   id: string;
@@ -197,6 +197,19 @@ export class JevScheduler {
         this.#halt();
         if (run) this.#absorb(run);
         this.#set({ phase: "stopped", run, lastError: null });
+        return;
+      }
+      if (res.status === 429 && (body as { error?: string }).error === "busy") {
+        // The server's pool is full or the cap has no room for another worst-case
+        // call right now: release these ants to be picked up next cycle, no fallback.
+        this.#inFlight--;
+        for (const i of indices) {
+          if (this.#pending[i]) {
+            this.#pending[i] = 0;
+            e.world.commit[i] = 0;
+          }
+        }
+        this.#set({ pending: Math.max(0, this.#state.pending - indices.length), run: (body as { run?: RunSummary }).run ?? this.#state.run });
         return;
       }
       if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
