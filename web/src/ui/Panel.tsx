@@ -1,17 +1,21 @@
-import type { ReactNode } from "react";
-import type { EngineStats } from "../sim/engine.ts";
+import { useEffect, useRef, type ReactNode } from "react";
+import type { Engine, EngineStats } from "../sim/engine.ts";
 import type { Controls } from "./useEngine.ts";
 
 interface Props {
+  engine: Engine;
   controls: Controls;
   update: (patch: Partial<Controls>) => void;
   stats: EngineStats | null;
   fps: number;
   onScatter: () => void;
+  onImage: (file: File) => void;
+  imageError: string | null;
   children?: ReactNode;
 }
 
-export default function Panel({ controls, update, stats, fps, onScatter, children }: Props) {
+export default function Panel({ engine, controls, update, stats, fps, onScatter, onImage, imageError, children }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null);
   return (
     <aside className="flex w-full flex-col gap-5 lg:w-80">
       <section className="rounded-lg border border-line bg-panel p-4">
@@ -27,6 +31,20 @@ export default function Panel({ controls, update, stats, fps, onScatter, childre
           spellCheck={false}
         />
         <p className="mt-1 text-xs text-fg-3">Type a word; a new line makes a second row.</p>
+        <div className="mt-3 flex items-center gap-2">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
+          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={() => fileRef.current?.click()} title="A black-and-white picture works best; drop one on the field too">
+            Upload image…
+          </button>
+          {controls.image && (
+            <button type="button" className="flex min-w-0 items-center gap-1 text-sm text-fg-2 hover:text-fg" onClick={() => update({ image: null })} title="Back to the text">
+              <span className="truncate font-mono text-xs">{controls.image.name}</span>
+              <span aria-hidden>×</span>
+            </button>
+          )}
+        </div>
+        {imageError && <p className="mt-1 text-xs text-err">{imageError}</p>}
+        <TargetPreview engine={engine} version={stats?.targetVersion ?? 0} />
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-4">
@@ -46,6 +64,10 @@ export default function Panel({ controls, update, stats, fps, onScatter, childre
         <label className="mt-3 flex items-center justify-between text-sm text-fg-2">
           <span>Deficit heatmap</span>
           <input type="checkbox" checked={controls.showHeatmap} onChange={(e) => update({ showHeatmap: e.target.checked })} />
+        </label>
+        <label className="mt-1 flex items-center justify-between text-sm text-fg-2">
+          <span>Pheromone trails</span>
+          <input type="checkbox" checked={controls.showTrails} onChange={(e) => update({ showTrails: e.target.checked })} />
         </label>
         <div className="mt-4 flex gap-2">
           <button type="button" className="flex-1 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>
@@ -78,6 +100,33 @@ export default function Panel({ controls, update, stats, fps, onScatter, childre
       </section>
     </aside>
   );
+}
+
+/** The target grid as it is: what the ants are asked to draw, darkest cell = full ink. */
+function TargetPreview({ engine, version }: { engine: Engine; version: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const { w, h } = engine.params.size;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    const img = ctx.createImageData(w, h);
+    const t = engine.target;
+    let max = 0;
+    for (let i = 0; i < t.length; i++) max = Math.max(max, t[i] as number);
+    for (let i = 0; i < t.length; i++) {
+      const v = max > 0 ? (t[i] as number) / max : 0;
+      const o = i * 4;
+      img.data[o] = 30;
+      img.data[o + 1] = 28;
+      img.data[o + 2] = 24;
+      img.data[o + 3] = Math.round(255 * v);
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [engine, version]);
+  return <canvas ref={ref} className="mt-3 w-full rounded border border-line bg-paper [image-rendering:pixelated]" style={{ aspectRatio: `${engine.params.size.w} / ${engine.params.size.h}` }} aria-label="target preview" />;
 }
 
 function seg(active: boolean): string {

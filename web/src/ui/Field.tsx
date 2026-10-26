@@ -12,6 +12,8 @@ interface Props {
   engine: Engine;
   onFrame: (fn: () => void) => () => void;
   showHeatmap: boolean;
+  /** fading dots where moving ants have been */
+  showTrails: boolean;
   /** the overseer's last box, normalised edges, drawn in jade */
   box: { top: number; bottom: number; left: number; right: number } | null;
   boxSteering: boolean;
@@ -21,10 +23,16 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-export default function Field({ engine, onFrame, showHeatmap, box, boxSteering }: Props) {
+export default function Field({ engine, onFrame, showHeatmap, showTrails, box, boxSteering }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
+  const trailRef = useRef<HTMLCanvasElement | null>(null);
   const showHeat = useRef(showHeatmap);
+  const trails = useRef(showTrails);
+  useEffect(() => {
+    trails.current = showTrails;
+    if (!showTrails && trailRef.current) trailRef.current.getContext("2d")!.clearRect(0, 0, trailRef.current.width, trailRef.current.height);
+  }, [showTrails]);
   const boxRef = useRef<{ box: Props["box"]; steering: boolean }>({ box, steering: boxSteering });
   useEffect(() => {
     showHeat.current = showHeatmap;
@@ -43,6 +51,8 @@ export default function Field({ engine, onFrame, showHeatmap, box, boxSteering }
     heat.height = gh;
     const heatCtx = heat.getContext("2d")!;
     const heatImg = heatCtx.createImageData(gw, gh);
+    const trail = (trailRef.current ??= document.createElement("canvas"));
+    const trailCtx = trail.getContext("2d")!;
 
     let paper = cssVar("--paper");
     let ink = cssVar("--ink");
@@ -67,6 +77,8 @@ export default function Field({ engine, onFrame, showHeatmap, box, boxSteering }
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
+        trail.width = w;
+        trail.height = h;
       }
     };
     const ro = new ResizeObserver(fit);
@@ -108,6 +120,23 @@ export default function Field({ engine, onFrame, showHeatmap, box, boxSteering }
 
       const w = engine.world;
       const len = Math.max(2, Math.min(sx, sy) * 0.55);
+
+      if (trails.current) {
+        // Fade what is there, stamp every moving ant, then lay the trail under the ants.
+        trailCtx.globalCompositeOperation = "destination-out";
+        trailCtx.fillStyle = "rgba(0,0,0,0.035)";
+        trailCtx.fillRect(0, 0, W, H);
+        trailCtx.globalCompositeOperation = "source-over";
+        trailCtx.fillStyle = accent;
+        trailCtx.globalAlpha = 0.3;
+        const dot = Math.max(1, len * 0.3);
+        for (let i = 0; i < w.n; i++) {
+          if (w.settled[i]) continue;
+          trailCtx.fillRect((w.x[i] as number) * sx - dot / 2, (w.y[i] as number) * sy - dot / 2, dot, dot);
+        }
+        trailCtx.globalAlpha = 1;
+        ctx.drawImage(trail, 0, 0);
+      }
       const half = len / 2;
       ctx.lineCap = "round";
       for (const pass of [0, 1] as const) {

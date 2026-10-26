@@ -41,6 +41,8 @@ export interface EngineStats {
   time: number;
   coverage: number;
   formed: boolean;
+  /** bumps on every setTarget, so the UI can tell a new picture from the one it formed */
+  targetVersion: number;
   settled: number;
   due: number;
   decisions: { local: number; jev: number };
@@ -58,6 +60,7 @@ export class Engine {
   /** sim seconds */
   time = 0;
   formed = false;
+  targetVersion = 0;
   /** coverage from the last tick */
   coverage = 0;
   idleBehaviour: IdleBehaviour = "wander";
@@ -91,6 +94,7 @@ export class Engine {
 
   /** Replace the picture. Everyone wakes up (settled ants re-evaluate) but nobody moves yet. */
   setTarget(target: Float32Array): void {
+    this.targetVersion++;
     if (target.length !== this.target.length) throw new Error("target does not match the grid");
     this.target = target;
     this.formed = false;
@@ -262,6 +266,6 @@ export class Engine {
     else if (cov < p.formedAt - 0.1) this.formed = false;
     let settled = 0;
     for (let i = 0; i < this.world.n; i++) settled += this.world.settled[i] as number;
-    return { time: this.time, coverage: cov, formed: this.formed, settled, due: left, decisions: { ...this.decisions } };
+    return { time: this.time, coverage: cov, formed: this.formed, targetVersion: this.targetVersion, settled, due: left, decisions: { ...this.decisions } };
   }
 }

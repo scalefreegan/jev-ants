@@ -8,7 +8,7 @@ import { JevScheduler, type SchedulerState } from "./jevScheduler.ts";
 // React face of the scheduler: one instance per engine, its state mirrored
 // into React, caps and schema editable, and the "formed → stop" rule.
 
-export function useJev(engine: Engine, formed: boolean) {
+export function useJev(engine: Engine, formed: boolean, targetVersion: number) {
   const scheduler = useMemo(() => new JevScheduler(engine), [engine]);
   const [state, setState] = useState<SchedulerState>(scheduler.state);
   const [caps, setCaps] = useState<RunCaps>(DEFAULT_CAPS);
@@ -45,8 +45,12 @@ export function useJev(engine: Engine, formed: boolean) {
   // something and a few seconds have passed, so a picture the local rule left
   // behind does not end the run before it starts.
   useEffect(() => {
-    if (formed && stopOnFormed && state.phase === "running" && state.requestsSent > 0 && scheduler.runSeconds > 3) void scheduler.stop("formed");
-  }, [formed, stopOnFormed, state.phase, state.requestsSent, scheduler]);
+    if (formed && stopOnFormed && state.phase === "running" && state.requestsSent > 0 && scheduler.runSeconds > 3) {
+      void scheduler.stop("formed");
+    }
+  }, [formed, stopOnFormed, state.phase, state.requestsSent, scheduler, engine]);
+  // The target changed since the run ended: Start is a morph from the old shape.
+  const morphPending = state.phase === "stopped" && targetVersion !== state.stoppedOnTarget;
 
-  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer };
+  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer, morphPending };
 }

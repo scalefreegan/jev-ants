@@ -14,6 +14,8 @@ interface Props {
   setStopOnFormed: (v: boolean) => void;
   overseer: boolean;
   setOverseer: (v: boolean) => void;
+  /** the picture changed since the last run ended: Start walks the ants from the old shape to the new */
+  morphPending: boolean;
   activeAnts: number;
   jevDecisions: number;
 }
@@ -37,7 +39,8 @@ export default function JevPanel(p: Props) {
           {reason === "spend-cap" ? "Spend cap reached." : "Time cap reached."} Ants are on the local rule. Raise the cap or Start again.
         </p>
       )}
-      {stopped && reason === "formed" && <p className="mt-2 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Formed. Jev is paused; the picture costs nothing to hold.</p>}
+      {stopped && reason === "formed" && !p.morphPending && <p className="mt-2 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Formed. Jev is paused; the picture costs nothing to hold.</p>}
+      {p.morphPending && <p className="mt-2 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">New picture. Morph walks the ants from where they stand into it.</p>}
       {p.state.lastError && <p className="mt-2 truncate rounded-md bg-err-soft px-3 py-2 text-xs text-err" title={p.state.lastError}>{p.state.lastError}</p>}
 
       <div className="mt-3 flex gap-2">
@@ -47,7 +50,7 @@ export default function JevPanel(p: Props) {
           </button>
         ) : (
           <button type="button" className="flex-1 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={p.start}>
-            Start Jev
+            {p.morphPending ? "Morph" : "Start Jev"}
           </button>
         )}
         <div className="flex overflow-hidden rounded-md border border-line text-sm">

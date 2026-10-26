@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Engine, type Brain, type EngineStats } from "../sim/engine.ts";
 import { normalizeTarget } from "../sim/grid.ts";
-import { textToDarkness } from "../sim/targets.ts";
+import { imageToDarkness, textToDarkness } from "../sim/targets.ts";
 
 // Owns the one Engine and the animation loop. React state carries only what
 // the panel shows (stats, params); the renderer reads the engine directly
@@ -9,14 +9,17 @@ import { textToDarkness } from "../sim/targets.ts";
 
 export interface Controls {
   text: string;
+  /** an uploaded picture wins over the text while it is set */
+  image: { name: string; darkness: Float32Array } | null;
   antCount: number;
   speed: number;
   brain: Brain;
   playing: boolean;
   showHeatmap: boolean;
+  showTrails: boolean;
 }
 
-export const DEFAULT_CONTROLS: Controls = { text: "ANTS", antCount: 1000, speed: 1, brain: "jev", playing: true, showHeatmap: false };
+export const DEFAULT_CONTROLS: Controls = { text: "ANTS", antCount: 1000, speed: 1, brain: "jev", playing: true, showHeatmap: false, showTrails: false, image: null };
 
 export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
   // One engine for the component's life; the hook mutates its params in place on purpose.
@@ -29,11 +32,14 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
   const darknessRef = useRef<Float32Array | null>(null);
   const frameListeners = useRef(new Set<() => void>());
 
-  // Target: text → darkness (cached) → normalised to the current ant count.
+  // Target: image or text → darkness (cached) → normalised to the current ant
+  // count. A new picture in Jev mode puts idle ants back to wandering, so the
+  // free local rule does not quietly form it before Jev is asked to.
   useEffect(() => {
-    darknessRef.current = textToDarkness(controls.text, engine.params.size);
+    darknessRef.current = controls.image ? controls.image.darkness : textToDarkness(controls.text, engine.params.size);
     engine.setTarget(normalizeTarget(darknessRef.current, engine.world.n));
-  }, [controls.text, engine]);
+    if (engine.params.brain === "jev") engine.idleBehaviour = "wander";
+  }, [controls.text, controls.image, engine]);
 
   useEffect(() => {
     if (controls.antCount !== engine.world.n) {
@@ -86,6 +92,21 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
 
   const scatter = useCallback(() => engine.scatter(), [engine]);
   const update = useCallback((patch: Partial<Controls>) => setControls((c) => ({ ...c, ...patch })), []);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const loadImage = useCallback(
+    async (file: File) => {
+      try {
+        const bmp = await createImageBitmap(file);
+        const darkness = imageToDarkness(bmp, engine.params.size);
+        bmp.close();
+        setImageError(null);
+        setControls((c) => ({ ...c, image: { name: file.name, darkness } }));
+      } catch {
+        setImageError(`Could not read ${file.name} as an image.`);
+      }
+    },
+    [engine],
+  );
 
-  return useMemo(() => ({ engine, controls, update, stats, fps, scatter, onFrame }), [engine, controls, update, stats, fps, scatter, onFrame]);
+  return useMemo(() => ({ engine, controls, update, stats, fps, scatter, onFrame, loadImage, imageError }), [engine, controls, update, stats, fps, scatter, onFrame, loadImage, imageError]);
 }

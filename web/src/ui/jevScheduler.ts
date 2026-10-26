@@ -60,6 +60,8 @@ export interface SchedulerState {
   /** the last reply's neutral point (what Jev answers for an ant with nothing around it) */
   neutral: Neutral | null;
   overseer: OverseerState | null;
+  /** engine.targetVersion when the last run ended */
+  stoppedOnTarget: number;
   /** client-side running total across runs this page-load, dollars */
   sessionUsd: number;
   sessionTokens: number;
@@ -76,7 +78,7 @@ export class JevScheduler {
   #inFlight = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
-  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, sessionUsd: 0, sessionTokens: 0 };
+  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, sessionUsd: 0, sessionTokens: 0 };
   #lastRunTokens = 0;
   #startedAt = 0;
 
@@ -155,6 +157,7 @@ export class JevScheduler {
       this.#overseerTimer = null;
     }
     this.#engine.attractor = null;
+    this.#set({ stoppedOnTarget: this.#engine.targetVersion });
     this.#engine.jevOwned.fill(0);
     // After a run the stragglers finish with the local rule, so a formed
     // picture stays formed without spending.
