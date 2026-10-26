@@ -6,7 +6,7 @@ still wants, and the headings of its neighbours, and Jev answers *which way* and
 *whether to settle*. From a random scatter, a thousand of those small decisions turn
 into a word, or an uploaded picture, in about fifteen seconds and seven cents.
 
-![ANTS forming](docs/ants.png)
+![ANTS forming](docs/ants.gif)
 
 ## Run it
 
