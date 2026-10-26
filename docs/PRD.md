@@ -151,16 +151,34 @@ Jev bills per input token. Parallelism changes latency, not cost: tokens per ant
 
 Questions, not state, dominate. A choice over 9 compass points is the single most expensive thing an ant can ask.
 
+### 8.1b Bake-off result (2026-10-25, `scripts/bakeoff.mjs`, 2×100 synthetic ants per schema, live API)
+
+Synthetic states with one unambiguous wanting neighbour (or a cell with room). Chance is 12.5% exact, 37.5% within 45°.
+
+| schema | tokens/ant | latency | direction exact | within 45° | settle when room | leave when over-full |
+|---|---|---|---|---|---|---|
+| A object + choice9 + score + noul (original) | 324 | 448 ms | 73% | 88% | 63% | 99% |
+| B string + choice9 | 211 | 218 ms | 57% | 65% | 75% | 100% |
+| C string + 3 nouls | 136 | 198 ms | 25% | 62% | 58% | 91% |
+| **D object + 3 nouls (N/S, E/W, settle)** | **178** | 277 ms | 32% | **85%** | **89%** | **100%** |
+| D2 terse-key object + 3 nouls | 146 | 210 ms | 27% | 74% | 98% | 87% |
+| D3 object + choice9 + settle noul | 285 | 304 ms | 71% | 87% | 88% | 99% |
+| E string + choice5 + settle noul | 177 | 219 ms | 42% | 78% | 52% | 91% |
+
+Two lessons. **Structure beats terseness**: the same facts as a compact string (B, C) lose 20 points of steering accuracy against a plain JSON object (A, D); the token saving is not worth it. **Nouls steer as well as a 9-way choice within 45°** (85% vs 88%) at 55% of the tokens, and settle better (89% vs 63%), because the settle question is asked on its own instead of being the "stay" option of a crowded choice. Exact-direction accuracy is lower for nouls by construction: two binary axes land on diagonals, and the heading is read as a continuous angle anyway.
+
+**Default brain: D** (`nouls`). **Selectable: D3** (`compass`) for the demo's comparison. The noul heading is `atan2(−(P(north)−0.5), P(east)−0.5)`; a magnitude under ~0.08 means "no preference" and the ant keeps its heading.
+
 ### 8.2 Levers, in order
 
-1. **Ask cheaper questions.** Default to the three-noul scheme (109 tok/ant). Keep the 9-way choice as a selectable "brain" for comparison. The first probe of the noul scheme showed only loose agreement with the deficit on a terse string state, so a **schema bake-off** (bead) scores each candidate on synthetic states with a known best direction before M3 commits: cost per ant × steering accuracy.
+1. **Ask cheaper questions.** Default to the three-noul scheme on a structured state (178 tok/ant, 2.1× cheaper than the original at equal steering within 45°). The 9-way choice stays selectable.
 2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1 cell when near a deficit and up to 3 when far, so the far-away phase costs a third as much. Settled ants re-ask only when their cell's deficit changes sign.
 3. **Stop.** Formed, time cap, or spend cap, whichever first. The local grid error (RMS of the deficit grid) is free and is the primary "formed" signal; the overseer noul confirms it for the badge. After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
 4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter and Morph re-arm the scheduler and the caps.
 
 ### 8.3 What a run should cost
 
-Estimate at 1,000 ants, three-noul schema, 2 s cadence, a ~90 s forming run where the active fraction decays from 1 to ~0.2 (mean ~0.5): about 22k decisions × 109 tokens ≈ 2.5M tokens ≈ **$0.10 per formation**; with commit distance roughly **$0.04**. Full-tilt rate is ~55k tokens/s ≈ $8/hour, but a run stops at formed, so the hourly figure only matters if the picture never forms. The $0.50 default cap is therefore several formations, not a fraction of one.
+Estimate at 1,000 ants, three-noul schema on a structured state (178 tok/ant), 2 s cadence, a ~90 s forming run where the active fraction decays from 1 to ~0.2 (mean ~0.5): about 22k decisions × 178 tokens ≈ 4M tokens ≈ **$0.17 per formation**; with commit distance roughly **$0.07**. Full-tilt rate is ~90k tokens/s ≈ $13/hour, but a run stops at formed, so the hourly figure only matters if the picture never forms. The $0.50 default cap is therefore several formations, not a fraction of one.
 
 ### 8.4 Real cost, not estimates
 
