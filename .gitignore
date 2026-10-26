@@ -12,3 +12,4 @@ exports/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+.playwright-mcp/

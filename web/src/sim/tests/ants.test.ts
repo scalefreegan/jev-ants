@@ -30,6 +30,10 @@ test("step walks along the heading, burns commit, bounces at the border, and lea
   assert.equal(step(w, 0.25), 0);
   assert.ok(Math.abs((w.x[0] as number) - 5.5) < 1e-5);
   assert.equal(step(w, 0.25), 1); // commit exhausted → due
+  assert.equal(w.pace[0], 1.5, "a due ant coasts at its coast pace until the next decision");
+  decide(w, 0, 0, 2, 0.1, false, 0, 2, 0);
+  step(w, 0.25);
+  assert.equal(w.pace[0], 0, "coast 0: the ant stops where it was sent");
   // bounce
   w.x[0] = 9.9;
   decide(w, 0, 0, 10, 100, false, 0, 1);

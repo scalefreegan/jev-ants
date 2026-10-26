@@ -1,9 +1,12 @@
 import Field from "./ui/Field.tsx";
+import JevPanel from "./ui/JevPanel.tsx";
 import Panel from "./ui/Panel.tsx";
 import { useEngine } from "./ui/useEngine.ts";
+import { useJev } from "./ui/useJev.ts";
 
 export default function App() {
   const { engine, controls, update, stats, fps, scatter, onFrame } = useEngine();
+  const jev = useJev(engine, stats?.formed ?? false);
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex items-baseline justify-between">
@@ -14,7 +17,9 @@ export default function App() {
         <div className="min-h-[360px] flex-1" style={{ aspectRatio: `${engine.params.size.w} / ${engine.params.size.h}` }}>
           <Field engine={engine} onFrame={onFrame} showHeatmap={controls.showHeatmap} />
         </div>
-        <Panel controls={controls} update={update} stats={stats} fps={fps} onScatter={scatter} />
+        <Panel controls={controls} update={update} stats={stats} fps={fps} onScatter={scatter}>
+          <JevPanel {...jev} activeAnts={stats ? controls.antCount - stats.settled : controls.antCount} jevDecisions={stats?.decisions.jev ?? 0} />
+        </Panel>
       </div>
     </main>
   );

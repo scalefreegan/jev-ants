@@ -18,9 +18,11 @@ export interface World {
   settled: Uint8Array;
   /** cells of travel left before the ant asks for a new decision */
   commit: Float32Array;
+  /** cells/s to drift at once commit is spent, while waiting for the next decision (0 = stop and wait) */
+  coast: Float32Array;
   /** sim-time (seconds) of the last decision, for staleness scheduling */
   decidedAt: Float32Array;
-  /** who decided last: 0 none, 1 local rule, 2 Jev */
+  /** who decided last: 0 none/wander, 1 local rule, 2 Jev */
   decidedBy: Uint8Array;
 }
 
@@ -34,6 +36,7 @@ export function createWorld(size: GridSize, n: number, rng: () => number = Math.
     pace: new Float32Array(n),
     settled: new Uint8Array(n),
     commit: new Float32Array(n),
+    coast: new Float32Array(n),
     decidedAt: new Float32Array(n),
     decidedBy: new Uint8Array(n),
   };
@@ -50,6 +53,7 @@ export function scatter(w: World, rng: () => number = Math.random): void {
     w.pace[i] = 0;
     w.settled[i] = 0;
     w.commit[i] = 0;
+    w.coast[i] = 0;
     w.decidedAt[i] = -1e9;
     w.decidedBy[i] = 0;
   }
@@ -70,11 +74,16 @@ export function occupancy(w: World, out?: Uint16Array): Uint16Array {
   return o;
 }
 
+/** default cells/s an ant drifts at once its commit distance is spent and it is waiting for a decision */
+export const COAST_PACE = 1.5;
+
 /**
  * Integrate one frame. Unsettled ants walk along their heading at their pace
  * and burn commit distance; at the border they turn back in. Settled ants do
- * not move. Returns how many ants are now due for a decision (commit ≤ 0 and
- * not settled).
+ * not move. An ant whose commit is spent slows to its coast pace (0 = stop) so
+ * it does not overshoot the cell it was sent to while it waits for the next
+ * decision (the Jev cadence is ~1.5 s).
+ * Returns how many ants are now due for a decision (commit ≤ 0 and not settled).
  */
 export function step(w: World, dt: number): number {
   let due = 0;
@@ -98,16 +107,20 @@ export function step(w: World, dt: number): number {
       w.y[i] = ny;
       w.commit[i] = (w.commit[i] as number) - d;
     }
-    if ((w.commit[i] as number) <= 0) due++;
+    if ((w.commit[i] as number) <= 0) {
+      if ((w.pace[i] as number) > (w.coast[i] as number)) w.pace[i] = w.coast[i] as number;
+      due++;
+    }
   }
   return due;
 }
 
-/** Apply a decision: heading in radians, pace in cells/s, commit distance in cells. */
-export function decide(w: World, i: number, heading: number, pace: number, commit: number, settled: boolean, now: number, by: 1 | 2): void {
+/** Apply a decision: heading in radians, pace in cells/s, commit distance in cells, coast pace after that. */
+export function decide(w: World, i: number, heading: number, pace: number, commit: number, settled: boolean, now: number, by: 0 | 1 | 2, coast = COAST_PACE): void {
   w.heading[i] = heading;
   w.pace[i] = settled ? 0 : pace;
   w.commit[i] = settled ? 0 : commit;
+  w.coast[i] = settled ? 0 : coast;
   w.settled[i] = settled ? 1 : 0;
   w.decidedAt[i] = now;
   w.decidedBy[i] = by;

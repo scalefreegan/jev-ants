@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { EngineStats } from "../sim/engine.ts";
 import type { Controls } from "./useEngine.ts";
 
@@ -7,9 +8,10 @@ interface Props {
   stats: EngineStats | null;
   fps: number;
   onScatter: () => void;
+  children?: ReactNode;
 }
 
-export default function Panel({ controls, update, stats, fps, onScatter }: Props) {
+export default function Panel({ controls, update, stats, fps, onScatter, children }: Props) {
   return (
     <aside className="flex w-full flex-col gap-5 lg:w-80">
       <section className="rounded-lg border border-line bg-panel p-4">
@@ -33,11 +35,11 @@ export default function Panel({ controls, update, stats, fps, onScatter }: Props
         <div className="mt-3 flex items-center justify-between">
           <span className="text-sm text-fg-2">Brain</span>
           <div className="flex overflow-hidden rounded-md border border-line text-sm">
-            <button type="button" className={seg(controls.brain === "local")} onClick={() => update({ brain: "local" })}>
-              Local
-            </button>
-            <button type="button" className={seg(controls.brain === "jev")} disabled title="Milestone 3">
+            <button type="button" className={seg(controls.brain === "jev")} onClick={() => update({ brain: "jev" })} title="Ants drift until you Start Jev; every step is then a Jev decision">
               Jev
+            </button>
+            <button type="button" className={seg(controls.brain === "local")} onClick={() => update({ brain: "local" })} title="The greedy local rule, free, for comparison">
+              Local rule
             </button>
           </div>
         </div>
@@ -55,6 +57,8 @@ export default function Panel({ controls, update, stats, fps, onScatter }: Props
         </div>
       </section>
 
+      {children}
+
       <section className="rounded-lg border border-line bg-panel p-4 font-mono text-sm">
         <div className="flex items-baseline justify-between">
           <span className="text-fg-3">formed</span>
@@ -65,7 +69,7 @@ export default function Panel({ controls, update, stats, fps, onScatter }: Props
           <dt className="text-fg-3">settled</dt>
           <dd className="text-right">{stats ? `${stats.settled} / ${controls.antCount}` : "—"}</dd>
           <dt className="text-fg-3">decisions</dt>
-          <dd className="text-right">{stats ? stats.decisions.local.toLocaleString() : "—"}</dd>
+          <dd className="text-right">{stats ? `${stats.decisions.local.toLocaleString()} local` : "—"}</dd>
           <dt className="text-fg-3">sim time</dt>
           <dd className="text-right">{stats ? `${stats.time.toFixed(1)}s` : "—"}</dd>
           <dt className="text-fg-3">fps</dt>
@@ -77,7 +81,7 @@ export default function Panel({ controls, update, stats, fps, onScatter }: Props
 }
 
 function seg(active: boolean): string {
-  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"} disabled:cursor-not-allowed disabled:opacity-40`;
+  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"}`;
 }
 
 function Slider({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {

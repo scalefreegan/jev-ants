@@ -49,7 +49,7 @@ test("setTarget wakes everyone; scatter unforms; a blank target forms nothing", 
   assert.equal(s.formed, false);
 });
 
-test("in jev mode the engine leaves jev-owned due ants alone and counts them", () => {
+test("in jev mode: owned due ants are left alone; unowned ants wander before a run and use the local rule after one", () => {
   const size = { w: 24, h: 16 };
   const e = new Engine({ size, antCount: 10, brain: "jev" }, seeded(5));
   e.setTarget(normalizeTarget(rectDarkness(size.w, size.h), 10));
@@ -58,7 +58,13 @@ test("in jev mode the engine leaves jev-owned due ants alone and counts them", (
   assert.equal(s.due, 10);
   assert.equal(s.decisions.local, 0);
   e.jevOwned.fill(0);
-  const s2 = e.tick(1 / 60);
+  const s2 = e.tick(1 / 60); // idleBehaviour defaults to "wander"
   assert.equal(s2.due, 0);
-  assert.equal(s2.decisions.local, 10);
+  assert.equal(s2.decisions.local, 0);
+  assert.equal(s2.settled, 0);
+  for (let i = 0; i < 10; i++) assert.ok((e.world.pace[i] as number) > 0 && (e.world.commit[i] as number) > 0);
+  e.idleBehaviour = "local";
+  for (let i = 0; i < 10; i++) e.world.commit[i] = 0;
+  const s3 = e.tick(1 / 60);
+  assert.equal(s3.decisions.local, 10);
 });

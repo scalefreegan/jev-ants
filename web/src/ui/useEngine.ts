@@ -16,7 +16,7 @@ export interface Controls {
   showHeatmap: boolean;
 }
 
-export const DEFAULT_CONTROLS: Controls = { text: "ANTS", antCount: 1000, speed: 1, brain: "local", playing: true, showHeatmap: false };
+export const DEFAULT_CONTROLS: Controls = { text: "ANTS", antCount: 1000, speed: 1, brain: "jev", playing: true, showHeatmap: false };
 
 export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
   // One engine for the component's life; the hook mutates its params in place on purpose.
@@ -45,6 +45,8 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
   useEffect(() => {
     engine.params.speed = controls.speed;
     engine.params.brain = controls.brain;
+    // Switching to the local rule and back: a fresh jev-mode idle wanders again.
+    if (controls.brain === "jev") engine.idleBehaviour = "wander";
   }, [controls.speed, controls.brain, engine]);
 
   // The loop. dt is clamped so a background tab does not fast-forward on return.
