@@ -31,8 +31,8 @@
 
 1. The target (text or image) becomes a grid of how many ants each cell wants. Wherever ants stand, the grid's **deficit** says which cells want more and which have too many.
 2. Each ant's state is small: a 3x3 deficit window (its own cell in the centre), whether its cell has `room` for it, local `crowd`, its `heading`, its neighbours' headings, and a direction toward far-away want or the overseer's box.
-3. One request carries about a hundred ants as a JSON object with one key per ant. Each ant gets its own `choice` (eight compass directions or stay) and its own `noul` (settle). Jev evaluates each question against the state independently, so a packed request costs the same as a hundred single ones but takes one round trip (~300 ms). Six requests run in parallel, the browser's per-host connection limit.
-4. Answers become moves. From a random scatter, about five decisions per ant produce the picture in roughly fifteen seconds. A formed picture costs nothing to hold.
+3. One request carries about a hundred ants as a JSON object with one key per ant. Each ant gets its own `choice` (eight compass directions or stay) and its own `noul` (settle). Jev evaluates each question against the state independently, so a packed request costs the same as a hundred single ones but takes one round trip (~300 ms). Five requests run in parallel (`JEV_IN_FLIGHT`, default 5, max 6), which leaves one of the browser's six per-host connections free so Stop is never queued behind billed calls.
+4. Answers become moves. From a random scatter, about five decisions per ant produce the picture in about 13 s in a live run (PRD §8.5). A formed picture costs nothing to hold.
 
 | | per ant | per 1,000-ant formation |
 |---|---|---|
@@ -47,9 +47,12 @@ Output tokens are free. The overseer adds about 1,300 tokens per look. The schem
 
 ```sh
 export JEV_API_KEY=...      # your TypeSafe key; the browser never sees it
+# optional: JEV_IN_FLIGHT=5   # concurrent Jev requests, 1-6
 cd web && npm install && npm run dev
 open http://localhost:38500
 ```
+
+From the repo root, `npm run dev`, `npm test`, `npm run lint` and `npm run typecheck` forward to `web/`. `npm run probe` runs `scripts/probe.mjs`, which sends packed requests straight to the Jev API and **is billed**; `scripts/bakeoff.mjs` (the schema comparison in the PRD) is billed too.
 
 The dev server is the app: Vite serves the React front end, and a small middleware holds the key, forwards packed requests to `api.typesafe.ai`, and enforces the spend and time caps.
 
@@ -62,7 +65,7 @@ The dev server is the app: Vite serves the React front end, and a small middlewa
 
 ## Hosting
 
-Build the front end (`npm run build`), serve `web/dist` statically, and run the same handlers from `web/server/api.ts` behind any Node HTTP server with `JEV_API_KEY` in its environment. The handlers check `Origin` against the host and keep the key out of every response and log. All visitors share one spend ledger, so a hosted copy should lower the default caps.
+The API currently exists only as Vite dev-server middleware (`apply: "serve"` in `web/server/api.ts`), so there is no production server yet. To host it, build the front end (`cd web && npm run build`), serve `web/dist` statically, and mount the handlers from `makeHandlers` in `web/server/api.ts` behind a Node HTTP server with `JEV_API_KEY` in its environment. The handlers check `Origin` against the host and keep the key out of every response and log. All visitors share one spend ledger, so a hosted copy should lower the default caps.
 
 ## Development
 
