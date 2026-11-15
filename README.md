@@ -13,7 +13,6 @@
 <p align="center">
   <img src="docs/hero.png" width="800" alt="A crowd of small ants gathering into a bold shape on a grid, with one ant's 3x3 neighbourhood highlighted">
 </p>
-<!-- TODO: generate docs/hero.png from docs/hero-image-prompt.md -->
 
 <p align="center"><sub><em>A thousand ants, each asking Jev "which way?", settle into the picture you asked for.</em></sub></p>
 
