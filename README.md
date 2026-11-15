@@ -18,13 +18,39 @@
 
 ## Features
 
-- **Type a word or drop an image.** Two lines of text make two rows; black-and-white pictures work best, and a target preview shows what the ants are asked to draw.
-- **One agent per ant.** Each ant sees the nine cells around it, how many ants each still wants, and its neighbours' headings. Jev answers *which way* and *whether to settle*.
-- **Morph between pictures.** Change the target while stopped and the ants walk from the old shape into the new one.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/ants-converging.png" width="100%" alt="One agent per ant">
+      <br><sub><em>Four seconds in: 1,000 ants, 1,909 Jev decisions, $0.03.</em></sub>
+      <h3>One agent per ant</h3>
+      <p>Each ant sees the nine cells around it, how many ants each still wants, and its neighbours' headings. Jev answers <em>which way</em> and <em>whether to settle</em>.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/typed-text.png" width="100%" alt="Type a word">
+      <br><sub><em>Formed from the word ANTS in 12 s for about $0.06.</em></sub>
+      <h3>Type a word</h3>
+      <p>Two lines of text make two rows. A target preview shows what the ants are asked to draw, and the run stops itself once the picture has formed.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/uploaded-image.png" width="100%" alt="Or drop an image">
+      <br><sub><em>A black-and-white heart, uploaded and formed in 13 s.</em></sub>
+      <h3>Or drop an image</h3>
+      <p>Black-and-white pictures work best. Change the target while stopped and Morph walks the ants from the old shape into the new one.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/overlays.png" width="100%" alt="Overlays and a free baseline">
+      <br><sub><em>The free local-rule brain with the deficit heatmap and pheromone trails on.</em></sub>
+      <h3>Overlays and a free baseline</h3>
+      <p>Switch to a greedy gradient-walk brain for comparison, and overlay the deficit heatmap and pheromone trails to see what the ants are chasing.</p>
+    </td>
+  </tr>
+</table>
+
 - **Image overseer.** Every 4 s Jev looks at the field and the target as two PNGs and returns a box where ants are most lacking, used as an attractor.
-- **Cost and time caps.** Spend is metered from the real `usage.input_tokens` of every reply; runs stop at the spend cap (default $0.50) or time cap (default 3 min).
-- **Local-rule baseline.** A free greedy gradient-walk brain for comparison.
-- **Overlays** for the deficit heatmap and pheromone trails.
+- **Cost and time caps.** Spend is metered from the real `usage.input_tokens` of every reply; runs stop at the spend cap (default $0.50) or time cap (default 3 min). The panel shows running cost, tokens, latency and requests in flight.
 
 ## How it works
 
